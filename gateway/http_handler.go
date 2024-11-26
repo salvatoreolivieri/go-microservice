@@ -6,18 +6,19 @@ import (
 
 	common "github.com/salvatoreolivieri/commons"
 	pb "github.com/salvatoreolivieri/commons/api"
+	"github.com/salvatoreolivieri/omsv-gateway/gateway"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type handler struct {
-	client pb.OrderServiceClient
+	gateway gateway.OrdersGateway
 }
 
 type ItemsQuantity = []*pb.ItemsWithQuantity
 
-func NewHandler(client pb.OrderServiceClient) *handler {
-	return &handler{client}
+func NewHandler(gateway gateway.OrdersGateway) *handler {
+	return &handler{gateway}
 }
 
 func (h *handler) registerRoutes(mux *http.ServeMux) {
@@ -39,7 +40,7 @@ func (h *handler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	order, err := h.client.CreateOrder(r.Context(), &pb.CreateOrderRequest{
+	order, err := h.gateway.CreateOrder(r.Context(), &pb.CreateOrderRequest{
 		CustomerID: customerID,
 		Items:      items,
 	})
