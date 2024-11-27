@@ -29,8 +29,9 @@ func main() {
 		panic(err)
 	}
 
-	ctx := context.Background()
 	instanceID := discovery.GenerateInstanceID(serviceName)
+
+	ctx := context.Background()
 	if err := registry.Register(ctx, instanceID, serviceName, grpcAddr); err != nil {
 		panic(err)
 	}
