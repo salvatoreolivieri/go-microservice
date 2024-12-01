@@ -17,15 +17,23 @@ func NewService(store OrdersStore) *service {
 	return &service{store}
 }
 
-func (s *service) CreateOrder(ctx context.Context, payload *pb.CreateOrderRequest) (*pb.Order, error) {
+func (s *service) GetOrder(ctx context.Context, payload *pb.GetOrderRequest) (*pb.Order, error) {
+	order, err := s.store.Get(ctx, payload.OrderID, payload.CustomerID)
+	if err != nil {
+		return nil, err
+	}
 
-	items, err := s.ValidateOrder(ctx, payload)
+	return order, nil
+}
+
+func (s *service) CreateOrder(ctx context.Context, payload *pb.CreateOrderRequest, items []*pb.Item) (*pb.Order, error) {
+	orderID, err := s.store.Create(ctx, payload, items)
 	if err != nil {
 		return nil, err
 	}
 
 	order := &pb.Order{
-		ID:         "42",
+		ID:         orderID,
 		CustomerID: payload.CustomerID,
 		Status:     "pending",
 		Items:      items,

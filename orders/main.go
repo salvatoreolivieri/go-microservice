@@ -66,8 +66,6 @@ func main() {
 
 	NewGRPCHandler(grpcServer, service, channel)
 
-	service.CreateOrder(ctx)
-
 	log.Println("GRPC Server started at ", grpcAddr)
 
 	if err := grpcServer.Serve(listener); err != nil {

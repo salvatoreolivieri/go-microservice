@@ -22,10 +22,36 @@ func NewHandler(gateway gateway.OrdersGateway) *handler {
 }
 
 func (h *handler) registerRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("POST /api/customers/{customerID}/orders", h.HandleCreateOrder)
+	// static folder serving
+	mux.Handle("/", http.FileServer(http.Dir("public")))
+
+	mux.HandleFunc("POST /api/customers/{customerID}/orders", h.handleCreateOrder)
+	mux.HandleFunc("GET /api/customers/{customerID}/orders/{orderID}", h.handleGetOrder)
 }
 
-func (h *handler) HandleCreateOrder(w http.ResponseWriter, r *http.Request) {
+func (h *handler) handleGetOrder(w http.ResponseWriter, r *http.Request) {
+	customerID := r.PathValue("customerID")
+	orderID := r.PathValue("orderID")
+
+	order, err := h.gateway.GetOrder(r.Context(), orderID, customerID)
+
+	responseStatus := status.Convert(err)
+
+	if responseStatus != nil {
+
+		if responseStatus.Code() != codes.InvalidArgument {
+			common.WriteError(w, http.StatusBadRequest, responseStatus.Message())
+			return
+		}
+
+		common.WriteError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	common.WriteJSON(w, http.StatusOK, order)
+}
+
+func (h *handler) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	customerID := r.PathValue("customerID")
 
 	var items ItemsQuantity

@@ -25,7 +25,8 @@ func (s *Stripe) CreatePaymentLink(order *pb.Order) (string, error) {
 	// Implement your Stripe integration logic here
 	log.Printf("Creating payment link for order %v", order)
 
-	gatewaySuccessURL := fmt.Sprintf("%s/success.html", gatewayHTTPAddr)
+	gatewaySuccessURL := fmt.Sprintf("%s/success.html?customerID=%s&orderID=%s", gatewayHTTPAddr, order.CustomerID, order.ID)
+	gatewayCancelURL := fmt.Sprintf("%s/cancel.html", gatewayHTTPAddr)
 
 	lineItems := []*stripe.CheckoutSessionLineItemParams{}
 	for _, item := range order.Items {
@@ -39,6 +40,7 @@ func (s *Stripe) CreatePaymentLink(order *pb.Order) (string, error) {
 		LineItems:  lineItems,
 		Mode:       stripe.String(string(stripe.CheckoutSessionModePayment)),
 		SuccessURL: stripe.String(gatewaySuccessURL),
+		CancelURL:  stripe.String(gatewayCancelURL),
 	}
 
 	result, err := session.New(params)
