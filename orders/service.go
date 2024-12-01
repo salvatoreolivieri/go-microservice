@@ -17,22 +17,45 @@ func NewService(store OrdersStore) *service {
 	return &service{store}
 }
 
-func (s *service) CreateOrder(context.Context) error {
-	return nil
+func (s *service) CreateOrder(ctx context.Context, payload *pb.CreateOrderRequest) (*pb.Order, error) {
+
+	items, err := s.ValidateOrder(ctx, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	order := &pb.Order{
+		ID:         "42",
+		CustomerID: payload.CustomerID,
+		Status:     "pending",
+		Items:      items,
+	}
+
+	return order, nil
 }
 
-func (s *service) ValidateOrder(ctx context.Context, order *pb.CreateOrderRequest) error {
+func (s *service) ValidateOrder(ctx context.Context, order *pb.CreateOrderRequest) ([]*pb.Item, error) {
 	if len(order.Items) == 0 {
-		return common.ErrNoItems
+		return nil, common.ErrNoItems
 	}
 
 	mergedItems := mergeItemsQuantities(order.Items)
 
 	log.Printf("mergedItems: %v", mergedItems)
 
-	// validate with stock service
+	// TODO validate with stock service
 
-	return nil
+	// Temporary Mock for testing stripe implementation
+	var itemsWithPrice []*pb.Item
+	for _, i := range mergedItems {
+		itemsWithPrice = append(itemsWithPrice, &pb.Item{
+			PriceID:  "price_1QRFbrGYeC4mQTIr97tIVdYk",
+			ID:       i.ID,
+			Quantity: i.Quantity,
+		})
+	}
+
+	return itemsWithPrice, nil
 }
 
 // mergeItemsQuantities merges a slice of ItemsWithQuantity objects by summing their quantities

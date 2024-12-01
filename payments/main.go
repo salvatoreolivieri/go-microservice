@@ -10,6 +10,8 @@ import (
 	"github.com/salvatoreolivieri/commons/broker"
 	"github.com/salvatoreolivieri/commons/discovery"
 	"github.com/salvatoreolivieri/commons/discovery/consul"
+	stripeProcessor "github.com/salvatoreolivieri/omsv-payments/processor/stripe"
+	"github.com/stripe/stripe-go/v81"
 	"google.golang.org/grpc"
 )
 
@@ -21,6 +23,7 @@ var (
 	amqpPass    = common.EnvString("RABBITMQ_PASS", "guest")
 	amqpHost    = common.EnvString("RABBITMQ_HOST", "localhost")
 	amqpPort    = common.EnvString("RABBITMQ_PORT", "5672")
+	stripeKey   = common.EnvString("STRIPE_KEY", "sk_test_ZJRcUfX2bPvnYyJP1ZcjDFqr00ISxjxneB")
 )
 
 func main() {
@@ -46,6 +49,9 @@ func main() {
 	}()
 	defer registry.Deregister(ctx, instanceID, serviceName)
 
+	// Stripe setup
+	stripe.Key = stripeKey
+
 	// Message Broker Implementation
 	channel, close := broker.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
 	defer func() {
@@ -53,7 +59,10 @@ func main() {
 		channel.Close()
 	}()
 
-	service := NewService()
+	// Stripe processor
+	stripeProcessor := stripeProcessor.NewProcessor()
+
+	service := NewService(stripeProcessor)
 
 	amqpConsumer := NewConsumer(service)
 	go amqpConsumer.Listen(channel)
