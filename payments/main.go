@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net"
+	"net/http"
 	"time"
 
 	common "github.com/salvatoreolivieri/commons"
@@ -16,14 +17,16 @@ import (
 )
 
 var (
-	serviceName = "payment"
-	grpcAddr    = common.EnvString("GRPC_ADDR", "localhost:2001")
-	consulAddr  = common.EnvString("CONSUL_ADDR", "localhost:8500")
-	amqpUser    = common.EnvString("RABBITMQ_USER", "guest")
-	amqpPass    = common.EnvString("RABBITMQ_PASS", "guest")
-	amqpHost    = common.EnvString("RABBITMQ_HOST", "localhost")
-	amqpPort    = common.EnvString("RABBITMQ_PORT", "5672")
-	stripeKey   = common.EnvString("STRIPE_KEY", "sk_test_ZJRcUfX2bPvnYyJP1ZcjDFqr00ISxjxneB")
+	serviceName         = "payment"
+	grpcAddr            = common.EnvString("GRPC_ADDR", "localhost:2001")
+	consulAddr          = common.EnvString("CONSUL_ADDR", "localhost:8500")
+	amqpUser            = common.EnvString("RABBITMQ_USER", "guest")
+	amqpPass            = common.EnvString("RABBITMQ_PASS", "guest")
+	amqpHost            = common.EnvString("RABBITMQ_HOST", "localhost")
+	amqpPort            = common.EnvString("RABBITMQ_PORT", "5672")
+	stripeKey           = common.EnvString("STRIPE_KEY", "")
+	httpAddr            = common.EnvString("HTTP_ADDR", "localhost:8081")
+	endpointStripSecret = common.EnvString("ENDPOINT_STRIPE_SECRET", "whsec_87bf903d3a826432a3d54d3ce86ca4090976baa21fbf2f8a10effec4fc221419")
 )
 
 func main() {
@@ -66,6 +69,20 @@ func main() {
 
 	amqpConsumer := NewConsumer(service)
 	go amqpConsumer.Listen(channel)
+
+	// http server
+	mux := http.NewServeMux()
+
+	httpServer := NewPaymentHTTPHandler(channel)
+	httpServer.registerRoutes(mux)
+
+	go func() {
+		log.Printf("Starting HTTP server at %s", httpAddr)
+
+		if err := http.ListenAndServe(httpAddr, mux); err != nil {
+			log.Fatal("failed to start http server")
+		}
+	}()
 
 	// Instantiate the grpc server
 	grpcServer := grpc.NewServer()
