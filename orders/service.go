@@ -17,6 +17,15 @@ func NewService(store OrdersStore) *service {
 	return &service{store}
 }
 
+func (s *service) UpdateOrder(ctx context.Context, order *pb.Order) (*pb.Order, error) {
+	err := s.store.Update(ctx, order.ID, order)
+	if err != nil {
+		return nil, err
+	}
+
+	return order, nil
+}
+
 func (s *service) GetOrder(ctx context.Context, payload *pb.GetOrderRequest) (*pb.Order, error) {
 	order, err := s.store.Get(ctx, payload.OrderID, payload.CustomerID)
 	if err != nil {

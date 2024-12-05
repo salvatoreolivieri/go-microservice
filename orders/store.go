@@ -40,3 +40,17 @@ func (s *store) Get(ctx context.Context, orderID, customerID string) (*pb.Order,
 
 	return nil, errors.New("order not found")
 }
+
+func (s *store) Update(ctx context.Context, orderID string, order *pb.Order) error {
+
+	for i, o := range orders {
+		if o.ID == order.ID {
+			orders[i].Status = order.Status
+			orders[i].CustomerID = order.CustomerID
+
+			return nil
+		}
+	}
+
+	return nil
+}

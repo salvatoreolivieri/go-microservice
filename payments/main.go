@@ -11,6 +11,7 @@ import (
 	"github.com/salvatoreolivieri/commons/broker"
 	"github.com/salvatoreolivieri/commons/discovery"
 	"github.com/salvatoreolivieri/commons/discovery/consul"
+	"github.com/salvatoreolivieri/omsv-payments/gateway"
 	stripeProcessor "github.com/salvatoreolivieri/omsv-payments/processor/stripe"
 	"github.com/stripe/stripe-go/v81"
 	"google.golang.org/grpc"
@@ -24,7 +25,7 @@ var (
 	amqpPass            = common.EnvString("RABBITMQ_PASS", "guest")
 	amqpHost            = common.EnvString("RABBITMQ_HOST", "localhost")
 	amqpPort            = common.EnvString("RABBITMQ_PORT", "5672")
-	stripeKey           = common.EnvString("STRIPE_KEY", "")
+	stripeKey           = common.EnvString("STRIPE_KEY", "sk_test_51EUwtsGYeC4mQTIrsukGOGv5iynuNR7yaZaHhP2Dv90CwtjcNHZ6NIZQB4jK2p75cn3HcBm9YohzUFIub6JnWAQ7000SWYnMjW")
 	httpAddr            = common.EnvString("HTTP_ADDR", "localhost:8081")
 	endpointStripSecret = common.EnvString("ENDPOINT_STRIPE_SECRET", "whsec_87bf903d3a826432a3d54d3ce86ca4090976baa21fbf2f8a10effec4fc221419")
 )
@@ -64,8 +65,9 @@ func main() {
 
 	// Stripe processor
 	stripeProcessor := stripeProcessor.NewProcessor()
+	paymentGateway := gateway.NewGateway(registry)
 
-	service := NewService(stripeProcessor)
+	service := NewService(stripeProcessor, paymentGateway)
 
 	amqpConsumer := NewConsumer(service)
 	go amqpConsumer.Listen(channel)

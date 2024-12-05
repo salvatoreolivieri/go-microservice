@@ -26,6 +26,10 @@ func NewGRPCHandler(grpcServer *grpc.Server, service OrdersService, channel *amq
 	pb.RegisterOrderServiceServer(grpcServer, handler)
 }
 
+func (h *grpcHandler) UpdateOrder(ctx context.Context, payload *pb.Order) (*pb.Order, error) {
+	return h.service.UpdateOrder(ctx, payload)
+}
+
 func (h *grpcHandler) GetOrder(ctx context.Context, payload *pb.GetOrderRequest) (*pb.Order, error) {
 	return h.service.GetOrder(ctx, payload)
 }
