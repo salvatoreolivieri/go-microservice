@@ -21,10 +21,11 @@ func (s *store) Create(ctx context.Context, payload *pb.CreateOrderRequest, item
 
 	id := "42"
 	orders = append(orders, &pb.Order{
-		ID:         id,
-		CustomerID: payload.CustomerID,
-		Status:     "pending",
-		Items:      items,
+		ID:          id,
+		CustomerID:  payload.CustomerID,
+		Status:      "pending",
+		Items:       items,
+		PaymentLink: "",
 	})
 
 	return id, nil
@@ -41,12 +42,12 @@ func (s *store) Get(ctx context.Context, orderID, customerID string) (*pb.Order,
 	return nil, errors.New("order not found")
 }
 
-func (s *store) Update(ctx context.Context, orderID string, order *pb.Order) error {
+func (s *store) Update(ctx context.Context, orderID string, newOrder *pb.Order) error {
 
-	for i, o := range orders {
-		if o.ID == order.ID {
-			orders[i].Status = order.Status
-			orders[i].CustomerID = order.CustomerID
+	for i, order := range orders {
+		if order.ID == orderID {
+			orders[i].Status = newOrder.Status
+			orders[i].CustomerID = newOrder.CustomerID
 
 			return nil
 		}

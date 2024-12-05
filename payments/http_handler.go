@@ -92,6 +92,8 @@ func (h *PaymentHTTPHandler) handleCheckoutWebhook(w http.ResponseWriter, r *htt
 				Body:         marshalledOrder,
 				DeliveryMode: amqp.Persistent,
 			})
+
+			log.Println("Message published order.paid")
 		}
 	}
 
