@@ -32,17 +32,22 @@ func (s *service) GetOrder(ctx context.Context, payload *pb.GetOrderRequest) (*p
 		return nil, err
 	}
 
-	return order, nil
+	return order.ToProto(), nil
 }
 
 func (s *service) CreateOrder(ctx context.Context, payload *pb.CreateOrderRequest, items []*pb.Item) (*pb.Order, error) {
-	orderID, err := s.store.Create(ctx, payload, items)
+	orderID, err := s.store.Create(ctx, Order{
+		CustomerID:  payload.CustomerID,
+		Status:      "pending",
+		Items:       items,
+		PaymentLink: "",
+	})
 	if err != nil {
 		return nil, err
 	}
 
 	order := &pb.Order{
-		ID:         orderID,
+		ID:         orderID.Hex(),
 		CustomerID: payload.CustomerID,
 		Status:     "pending",
 		Items:      items,

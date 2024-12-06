@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -10,6 +11,9 @@ import (
 	"github.com/salvatoreolivieri/commons/discovery"
 	"github.com/salvatoreolivieri/commons/discovery/consul"
 	"github.com/salvatoreolivieri/omsv-orders/gateway"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
@@ -22,6 +26,9 @@ var (
 	amqpPass    = common.EnvString("RABBITMQ_PASS", "guest")
 	amqpHost    = common.EnvString("RABBITMQ_HOST", "localhost")
 	amqpPort    = common.EnvString("RABBITMQ_PORT", "5672")
+	mongoUser   = common.EnvString("MONGO_DB_USER", "root")
+	mongoPass   = common.EnvString("MONGO_DB_PASS", "example")
+	mongoAddr   = common.EnvString("MONGO_DB_HOST", "localhost:27017")
 	jaegerAddr  = common.EnvString("JAEGER_ADDR", "localhost:4318")
 )
 
@@ -65,6 +72,13 @@ func main() {
 		channel.Close()
 	}()
 
+	// mongo db conn
+	uri := fmt.Sprintf("mongodb://%s:%s@%s", mongoUser, mongoPass, mongoAddr)
+	mongoClient, err := connectToMongoDB(uri)
+	if err != nil {
+		logger.Fatal("failed to connect to mongo db", zap.Error(err))
+	}
+
 	grpcServer := grpc.NewServer()
 
 	listener, err := net.Listen("tcp", grpcAddr)
@@ -75,7 +89,7 @@ func main() {
 
 	gateway := gateway.NewGateway(registry)
 
-	store := NewStore()
+	store := NewStore(mongoClient)
 	service := NewService(store, gateway)
 	serviceWithTelemetry := NewTelemetryMiddleware(service)
 	serviceWithLogging := NewLoggingMiddleware(serviceWithTelemetry)
@@ -90,4 +104,16 @@ func main() {
 	if err := grpcServer.Serve(listener); err != nil {
 		logger.Fatal("failed to serve", zap.Error(err))
 	}
+}
+
+func connectToMongoDB(uri string) (*mongo.Client, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	client, err := mongo.Connect(ctx, options.Client().ApplyURI(uri))
+	if err != nil {
+		return nil, err
+	}
+
+	err = client.Ping(ctx, readpref.Primary())
+	return client, err
 }
