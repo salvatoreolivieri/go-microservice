@@ -42,7 +42,7 @@ func (c *consumer) Listen(ch *amqp.Channel) {
 		for d := range msgs {
 			log.Printf("Received message: %s", d.Body)
 
-			// extract the header
+			// Extract the headers
 			ctx := broker.ExtractAMQPHeaders(context.Background(), d.Headers)
 
 			tr := otel.Tracer("amqp")
@@ -50,19 +50,17 @@ func (c *consumer) Listen(ch *amqp.Channel) {
 
 			o := &pb.Order{}
 			if err := json.Unmarshal(d.Body, o); err != nil {
-				d.Nack(false, false) // not acknowledg if the unmarshal fails
+				d.Nack(false, false)
 				log.Printf("failed to unmarshal order: %v", err)
 				continue
 			}
 
 			_, err := c.service.UpdateOrder(context.Background(), o)
 			if err != nil {
-				d.Nack(false, false)
 				log.Printf("failed to update order: %v", err)
 
 				if err := broker.HandleRetry(ch, &d); err != nil {
-					log.Printf("error handling retry: %v", err)
-					return
+					log.Printf("Error handling retry: %v", err)
 				}
 
 				continue

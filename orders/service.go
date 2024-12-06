@@ -2,19 +2,19 @@ package main
 
 import (
 	"context"
-	"log"
 
 	common "github.com/salvatoreolivieri/commons"
 	pb "github.com/salvatoreolivieri/commons/api"
+	"github.com/salvatoreolivieri/omsv-orders/gateway"
 )
 
 type service struct {
-	store OrdersStore
+	store   OrdersStore
+	gateway gateway.StockGateway
 }
 
-func NewService(store OrdersStore) *service {
-
-	return &service{store}
+func NewService(store OrdersStore, gateway gateway.StockGateway) *service {
+	return &service{store, gateway}
 }
 
 func (s *service) UpdateOrder(ctx context.Context, order *pb.Order) (*pb.Order, error) {
@@ -58,21 +58,15 @@ func (s *service) ValidateOrder(ctx context.Context, order *pb.CreateOrderReques
 
 	mergedItems := mergeItemsQuantities(order.Items)
 
-	log.Printf("mergedItems: %v", mergedItems)
-
-	// TODO validate with stock service
-
-	// Temporary Mock for testing stripe implementation
-	var itemsWithPrice []*pb.Item
-	for _, i := range mergedItems {
-		itemsWithPrice = append(itemsWithPrice, &pb.Item{
-			PriceID:  "price_1QRFbrGYeC4mQTIr97tIVdYk",
-			ID:       i.ID,
-			Quantity: i.Quantity,
-		})
+	inStock, items, err := s.gateway.CheckIfItemIsInStock(ctx, order.CustomerID, mergedItems)
+	if err != nil {
+		return nil, err
+	}
+	if !inStock {
+		return items, common.ErrNoStock
 	}
 
-	return itemsWithPrice, nil
+	return items, nil
 }
 
 // mergeItemsQuantities merges a slice of ItemsWithQuantity objects by summing their quantities

@@ -9,14 +9,13 @@ import (
 	"github.com/salvatoreolivieri/commons/broker"
 	"github.com/salvatoreolivieri/commons/discovery"
 	"github.com/salvatoreolivieri/commons/discovery/consul"
-	"github.com/salvatoreolivieri/omsv-orders/gateway"
 	"go.uber.org/zap"
 	"google.golang.org/grpc"
 )
 
 var (
-	serviceName = "orders"
-	grpcAddr    = common.EnvString("GRPC_ADDR", "localhost:2000")
+	serviceName = "stock"
+	grpcAddr    = common.EnvString("GRPC_ADDR", "localhost:2002")
 	consulAddr  = common.EnvString("CONSUL_ADDR", "localhost:8500")
 	amqpUser    = common.EnvString("RABBITMQ_USER", "guest")
 	amqpPass    = common.EnvString("RABBITMQ_PASS", "guest")
@@ -26,14 +25,14 @@ var (
 )
 
 func main() {
+
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
 
 	zap.ReplaceGlobals(logger)
 
-	err := common.SetGlobalTracer(context.TODO(), serviceName, jaegerAddr)
-	if err != nil {
-		logger.Fatal("coul not set global tracer", zap.Error(err))
+	if err := common.SetGlobalTracer(context.TODO(), serviceName, jaegerAddr); err != nil {
+		logger.Fatal("could set global tracer", zap.Error(err))
 	}
 
 	registry, err := consul.NewRegistry(consulAddr, serviceName)
@@ -41,9 +40,8 @@ func main() {
 		panic(err)
 	}
 
-	instanceID := discovery.GenerateInstanceID(serviceName)
-
 	ctx := context.Background()
+	instanceID := discovery.GenerateInstanceID(serviceName)
 	if err := registry.Register(ctx, instanceID, serviceName, grpcAddr); err != nil {
 		panic(err)
 	}
@@ -51,14 +49,14 @@ func main() {
 	go func() {
 		for {
 			if err := registry.HealthCheck(instanceID, serviceName); err != nil {
-				logger.Error("failed to health check", zap.Error(err))
+				logger.Error("Failed to health check", zap.Error(err))
 			}
 			time.Sleep(time.Second * 1)
 		}
 	}()
+
 	defer registry.Deregister(ctx, instanceID, serviceName)
 
-	// Message Broker Implementation
 	channel, close := broker.Connect(amqpUser, amqpPass, amqpHost, amqpPort)
 	defer func() {
 		close()
@@ -67,27 +65,24 @@ func main() {
 
 	grpcServer := grpc.NewServer()
 
-	listener, err := net.Listen("tcp", grpcAddr)
+	l, err := net.Listen("tcp", grpcAddr)
 	if err != nil {
-		logger.Fatal("failer to listen", zap.Error(err))
+		logger.Fatal("failed to listen", zap.Error(err))
 	}
-	defer listener.Close()
-
-	gateway := gateway.NewGateway(registry)
+	defer l.Close()
 
 	store := NewStore()
-	service := NewService(store, gateway)
-	serviceWithTelemetry := NewTelemetryMiddleware(service)
-	serviceWithLogging := NewLoggingMiddleware(serviceWithTelemetry)
+	service := NewService(store)
+	svcWithTelemetry := NewTelemetryMiddleware(service)
 
-	NewGRPCHandler(grpcServer, serviceWithLogging, channel)
+	NewGRPCHandler(grpcServer, channel, svcWithTelemetry)
 
-	consumer := NewConsumer(serviceWithTelemetry)
+	consumer := NewConsumer()
 	go consumer.Listen(channel)
 
-	logger.Info("GRPC Server started", zap.String("port", grpcAddr))
+	logger.Info("Starting gRPC server", zap.String("port", grpcAddr))
 
-	if err := grpcServer.Serve(listener); err != nil {
+	if err := grpcServer.Serve(l); err != nil {
 		logger.Fatal("failed to serve", zap.Error(err))
 	}
 }

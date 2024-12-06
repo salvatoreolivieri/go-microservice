@@ -66,6 +66,8 @@ func (h *PaymentHTTPHandler) handleCheckoutWebhook(w http.ResponseWriter, r *htt
 			return
 		}
 
+		log.Println("session.PaymentStatus: %s", session.PaymentStatus)
+
 		if session.PaymentStatus == "paid" {
 			log.Printf("Payment for Checkout Session %v succeeded", session.ID)
 
