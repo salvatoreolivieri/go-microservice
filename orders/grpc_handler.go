@@ -15,6 +15,7 @@ import (
 
 type grpcHandler struct {
 	pb.UnimplementedOrderServiceServer
+
 	service OrdersService
 	channel *amqp.Channel
 }
@@ -24,59 +25,51 @@ func NewGRPCHandler(grpcServer *grpc.Server, service OrdersService, channel *amq
 		service: service,
 		channel: channel,
 	}
-
 	pb.RegisterOrderServiceServer(grpcServer, handler)
 }
 
-func (h *grpcHandler) UpdateOrder(ctx context.Context, payload *pb.Order) (*pb.Order, error) {
-	return h.service.UpdateOrder(ctx, payload)
+func (h *grpcHandler) UpdateOrder(ctx context.Context, p *pb.Order) (*pb.Order, error) {
+	return h.service.UpdateOrder(ctx, p)
 }
 
-func (h *grpcHandler) GetOrder(ctx context.Context, payload *pb.GetOrderRequest) (*pb.Order, error) {
-	return h.service.GetOrder(ctx, payload)
+func (h *grpcHandler) GetOrder(ctx context.Context, p *pb.GetOrderRequest) (*pb.Order, error) {
+	return h.service.GetOrder(ctx, p)
 }
 
-func (h *grpcHandler) CreateOrder(ctx context.Context, payload *pb.CreateOrderRequest) (*pb.Order, error) {
-	que, err := h.channel.QueueDeclare(broker.OrderCreatedEvent, true, false, false, false, nil)
+func (h *grpcHandler) CreateOrder(ctx context.Context, p *pb.CreateOrderRequest) (*pb.Order, error) {
+	q, err := h.channel.QueueDeclare(broker.OrderCreatedEvent, true, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	tr := otel.Tracer("amqp")
-	amqpContext, messageSpan := tr.Start(ctx, fmt.Sprintf("AMQP - publish - %s", que.Name))
+	amqpContext, messageSpan := tr.Start(ctx, fmt.Sprintf("AMQP - publish - %s", q.Name))
 	defer messageSpan.End()
 
-	_, err = h.service.ValidateOrder(amqpContext, payload)
+	items, err := h.service.ValidateOrder(amqpContext, p)
 	if err != nil {
 		return nil, err
 	}
 
-	log.Printf("New order received! Order: %v", payload)
-
-	items, err := h.service.ValidateOrder(amqpContext, payload)
+	o, err := h.service.CreateOrder(amqpContext, p, items)
 	if err != nil {
 		return nil, err
 	}
 
-	order, err := h.service.CreateOrder(amqpContext, payload, items)
+	marshalledOrder, err := json.Marshal(o)
 	if err != nil {
 		return nil, err
 	}
 
-	marshalledOrder, err := json.Marshal(order)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	// inject the header
+	// inject the headers
 	headers := broker.InjectAMQPHeaders(amqpContext)
 
-	h.channel.PublishWithContext(amqpContext, "", que.Name, false, false, amqp.Publishing{
+	h.channel.PublishWithContext(amqpContext, "", q.Name, false, false, amqp.Publishing{
 		ContentType:  "application/json",
 		Body:         marshalledOrder,
 		DeliveryMode: amqp.Persistent,
 		Headers:      headers,
 	})
 
-	return order, nil
+	return o, nil
 }
