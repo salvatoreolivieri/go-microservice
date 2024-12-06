@@ -1,5 +1,10 @@
 version: "3.9"
 services:
+  jaeger:
+    image: "jaegertracing/all-in-one:latest"
+    ports:
+      - "16686:16686"
+      - "4318:4318"
   consul:
     image: hashicorp/consul
     command: agent -server -ui -node=server-1 -bootstrap-expect=1 -client=0.0.0.0
