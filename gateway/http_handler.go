@@ -8,6 +8,7 @@ import (
 	common "github.com/salvatoreolivieri/commons"
 	pb "github.com/salvatoreolivieri/commons/api"
 	"github.com/salvatoreolivieri/omsv-gateway/gateway"
+	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -34,7 +35,11 @@ func (h *handler) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 	customerID := r.PathValue("customerID")
 	orderID := r.PathValue("orderID")
 
-	order, err := h.gateway.GetOrder(r.Context(), orderID, customerID)
+	tr := otel.Tracer("http")
+	ctx, span := tr.Start(r.Context(), fmt.Sprintf("%s %s", r.Method, r.RequestURI))
+	defer span.End()
+
+	order, err := h.gateway.GetOrder(ctx, orderID, customerID)
 
 	responseStatus := status.Convert(err)
 
@@ -61,13 +66,17 @@ func (h *handler) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	tr := otel.Tracer("http")
+	ctx, span := tr.Start(r.Context(), fmt.Sprintf("%s %s", r.Method, r.RequestURI))
+	defer span.End()
+
 	err := validateItems(items)
 	if err != nil {
 		common.WriteError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	order, err := h.gateway.CreateOrder(r.Context(), &pb.CreateOrderRequest{
+	order, err := h.gateway.CreateOrder(ctx, &pb.CreateOrderRequest{
 		CustomerID: customerID,
 		Items:      items,
 	})
