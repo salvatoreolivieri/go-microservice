@@ -26,7 +26,7 @@ func (c *consumer) Listen(channel *amqp.Channel) {
 		log.Fatal(err)
 	}
 
-	messages, err := channel.Consume(que.Name, "", true, false, false, false, nil)
+	messages, err := channel.Consume(que.Name, "", false, false, false, false, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -39,6 +39,7 @@ func (c *consumer) Listen(channel *amqp.Channel) {
 
 			order := &pb.Order{}
 			if err := json.Unmarshal(delivery.Body, order); err != nil {
+				delivery.Nack(false, false) // not acknowledging if the unmarshal fails
 				log.Printf("ailed to unmarshal order: %v", err)
 				continue
 			}
@@ -46,10 +47,19 @@ func (c *consumer) Listen(channel *amqp.Channel) {
 			paymentLink, err := c.service.CreatePayment(context.Background(), order)
 			if err != nil {
 				log.Printf("failed to create payment: %v", err)
+
+				if err := broker.HandleRetry(channel, &delivery); err != nil {
+					log.Printf("error handling retry: %v", err)
+					return
+				}
+
+				delivery.Nack(false, false)
+
 				continue
 			}
 
 			log.Printf("payment link created %s", paymentLink)
+			delivery.Ack(false)
 		}
 	}()
 
