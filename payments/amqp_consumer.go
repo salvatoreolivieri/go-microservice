@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 
 	amqp "github.com/rabbitmq/amqp091-go"
 	pb "github.com/salvatoreolivieri/commons/api"
+	"go.opentelemetry.io/otel"
 
 	"github.com/salvatoreolivieri/commons/broker"
 )
@@ -37,6 +39,12 @@ func (c *consumer) Listen(channel *amqp.Channel) {
 		for delivery := range messages {
 			log.Printf("Received message: %v", delivery.Body)
 
+			// extract the header
+			ctx := broker.ExtractAMQPHeaders(context.Background(), delivery.Headers)
+
+			tr := otel.Tracer("amqp")
+			_, messageSpan := tr.Start(ctx, fmt.Sprintf("AMQP - consume - %s", que.Name))
+
 			order := &pb.Order{}
 			if err := json.Unmarshal(delivery.Body, order); err != nil {
 				delivery.Nack(false, false) // not acknowledging if the unmarshal fails
@@ -57,6 +65,9 @@ func (c *consumer) Listen(channel *amqp.Channel) {
 
 				continue
 			}
+
+			messageSpan.AddEvent("payment.created")
+			messageSpan.End()
 
 			log.Printf("payment link created %s", paymentLink)
 			delivery.Ack(false)

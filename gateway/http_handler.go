@@ -9,6 +9,7 @@ import (
 	pb "github.com/salvatoreolivieri/commons/api"
 	"github.com/salvatoreolivieri/omsv-gateway/gateway"
 	"go.opentelemetry.io/otel"
+	otelCodes "go.opentelemetry.io/otel/codes"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -44,6 +45,7 @@ func (h *handler) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 	responseStatus := status.Convert(err)
 
 	if responseStatus != nil {
+		span.SetStatus(otelCodes.Error, err.Error())
 
 		if responseStatus.Code() != codes.InvalidArgument {
 			common.WriteError(w, http.StatusBadRequest, responseStatus.Message())
@@ -84,6 +86,7 @@ func (h *handler) handleCreateOrder(w http.ResponseWriter, r *http.Request) {
 	responseStatus := status.Convert(err)
 
 	if responseStatus != nil {
+		span.SetStatus(otelCodes.Error, err.Error())
 
 		if responseStatus.Code() != codes.InvalidArgument {
 			common.WriteError(w, http.StatusBadRequest, responseStatus.Message())

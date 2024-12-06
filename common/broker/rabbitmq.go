@@ -7,6 +7,7 @@ import (
 	"time"
 
 	amqp "github.com/rabbitmq/amqp091-go"
+	"go.opentelemetry.io/otel"
 )
 
 const MaxRetryCount = 3
@@ -148,4 +149,42 @@ func createDLQAndDLX(ch *amqp.Channel) error {
 	}
 
 	return err
+}
+
+type AmqpHeaderCarrier map[string]interface{}
+
+func (a AmqpHeaderCarrier) Get(key string) string {
+	value, ok := a[key]
+	if !ok {
+		return ""
+	}
+
+	return value.(string)
+}
+
+func (a AmqpHeaderCarrier) Set(key string, value string) {
+	a[key] = value
+}
+
+func (a AmqpHeaderCarrier) Keys() []string {
+	keys := make([]string, len(a))
+	i := 0
+
+	for key := range a {
+		keys[i] = key
+		i++
+	}
+
+	return keys
+}
+
+func InjectAMQPHeaders(ctx context.Context) map[string]interface{} {
+	carrier := make(AmqpHeaderCarrier)
+	otel.GetTextMapPropagator().Inject(ctx, carrier)
+
+	return carrier
+}
+
+func ExtractAMQPHeaders(ctx context.Context, headers map[string]interface{}) context.Context {
+	return otel.GetTextMapPropagator().Extract(ctx, AmqpHeaderCarrier(headers))
 }

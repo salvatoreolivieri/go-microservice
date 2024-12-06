@@ -74,8 +74,9 @@ func main() {
 	paymentGateway := gateway.NewGateway(registry)
 
 	service := NewService(stripeProcessor, paymentGateway)
+	serviceWithTelemetry := NewTelemetryMiddleware(service)
 
-	amqpConsumer := NewConsumer(service)
+	amqpConsumer := NewConsumer(serviceWithTelemetry)
 	go amqpConsumer.Listen(channel)
 
 	// http server
